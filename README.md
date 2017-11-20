@@ -1,4 +1,14 @@
-# curl for checking various TLS parameters.
+# cURL for checking various TLS parameters on JVM.
+
+# Installation
+
+## Linux/macOS
+
+```
+$ wget https://github.com/greymd/tlscurl/releases/download/v1.0.0/tlscurl_unix.tar.gz
+```
+
+## Windows
 
 # Build
 
