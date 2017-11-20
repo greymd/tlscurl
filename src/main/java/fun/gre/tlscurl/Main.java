@@ -1,27 +1,5 @@
 package fun.gre.tlscurl;
 
-import java.net.URI;
-import java.security.KeyManagementException;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
-import org.apache.commons.lang3.StringUtils;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
@@ -29,6 +7,7 @@ import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
+import org.apache.commons.lang3.StringUtils;
 import org.glassfish.jersey.SslConfigurator;
 import org.glassfish.jersey.apache.connector.ApacheClientProperties;
 import org.glassfish.jersey.apache.connector.ApacheConnectorProvider;
@@ -40,7 +19,25 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import javax.ws.rs.client.*;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.net.URI;
+import java.security.KeyManagementException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
 class Main {
+
+    private static final String VERSION = "v1.0.0";
 
     @Option(name = "-p", aliases = "--protocols", required = false, usage = "Provide protocols for TSL connection (i.e TLSv1, TLSv1.1 or TLSv1.2).")
     private String protocols = "TLSv1,TLSv1.1,TLSv1.2";
@@ -54,15 +51,25 @@ class Main {
     @Option(name = "-k", required = false, usage = "Allow self-certified SSL.")
     private Boolean allowAllCerts = false;
 
-    // receives other command line parameters than options
+    @Option(name = "-V", required = false, usage = "Show version and exit.")
+    private Boolean versionFlag = false;
+
+    @Option(name = "--help", required = false, usage = "Show help and exit.")
+    private Boolean helpFlag = false;
+
     @Argument
     private List<String> arguments = new ArrayList<String>();
 
-    // Create a trust manager that does not validate certificate chains
-    TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager(){
-        public X509Certificate[] getAcceptedIssuers(){return null;}
-        public void checkClientTrusted(X509Certificate[] certs, String authType){}
-        public void checkServerTrusted(X509Certificate[] certs, String authType){}
+    private TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
+        public X509Certificate[] getAcceptedIssuers() {
+            return null;
+        }
+
+        public void checkClientTrusted(X509Certificate[] certs, String authType) {
+        }
+
+        public void checkServerTrusted(X509Certificate[] certs, String authType) {
+        }
     }};
 
     private static final String[] SUPPORTED_CIPHER_SUITES = {
@@ -98,10 +105,26 @@ class Main {
         String url = null;
         String[] protocols = null;
         String[] ciphers = null;
-
         CmdLineParser parser = new CmdLineParser(this);
+
+
         try {
             parser.parseArgument(args);
+
+            if (this.helpFlag) {
+                System.out.println("Usage:");
+                System.out.println(" tlscurl [options]");
+                System.out.println(" tlscurl [options] [arguments]");
+                System.out.println();
+                System.out.println("Options:");
+                parser.printUsage(System.out);
+                System.exit(0);
+            }
+
+            if (this.versionFlag) {
+                System.err.println(this.VERSION);
+                System.exit(0);
+            }
 
             if (arguments.isEmpty())
                 throw new CmdLineException(parser, "No argument is given");
@@ -114,9 +137,9 @@ class Main {
             }
 
             Map<String, String> headers = new HashMap<String, String>();
-            headers.put("User-Agent", "cipher_curl");
+            headers.put("User-Agent", "tlscurl");
             WebTarget target;
-            target = makeTarget(url, protocols, ciphers, this.proxyUrl,null);
+            target = makeTarget(url, protocols, ciphers, this.proxyUrl, null);
             Response res = callPostAPI(target, "{\"payload\":1}", headers);
 
             System.out.println(res.toString());
@@ -139,7 +162,7 @@ class Main {
             sslContext = SslConfigurator.getDefaultContext();
         }
         try {
-            if(allowAllCerts) {
+            if (allowAllCerts) {
                 sslContext.init(null, this.trustAllCerts, new SecureRandom());
             }
         } catch (KeyManagementException e) {
@@ -162,7 +185,6 @@ class Main {
         BasicHttpClientConnectionManager connectionManager = new BasicHttpClientConnectionManager(registry);
         config.property(ApacheClientProperties.CONNECTION_MANAGER, connectionManager);
 
-        // If proxy is set.
         if (StringUtils.isNotBlank(proxyUrl)) {
             config.property(ClientProperties.PROXY_URI, URI.create(proxyUrl));
         }
