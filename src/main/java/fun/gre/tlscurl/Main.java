@@ -1,5 +1,9 @@
 package fun.gre.tlscurl;
 
+import java.net.URI;
+import java.security.KeyManagementException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -7,6 +11,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
@@ -27,6 +33,7 @@ import org.glassfish.jersey.SslConfigurator;
 import org.glassfish.jersey.apache.connector.ApacheClientProperties;
 import org.glassfish.jersey.apache.connector.ApacheConnectorProvider;
 import org.glassfish.jersey.client.ClientConfig;
+import org.glassfish.jersey.client.ClientProperties;
 import org.glassfish.jersey.client.JerseyClientBuilder;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -41,9 +48,22 @@ class Main {
     @Option(name = "-c", aliases = "--ciphers", required = false, usage = "Provide cipher suites for connection (i.e TLS_RSA_WITH_RC4_128_SHA).")
     private String ciphers = null;
 
+    @Option(name = "-x", required = false, usage = "Provide proxy address.")
+    private String proxyUrl = "";
+
+    @Option(name = "-k", required = false, usage = "Allow self-certified SSL.")
+    private Boolean allowAllCerts = false;
+
     // receives other command line parameters than options
     @Argument
     private List<String> arguments = new ArrayList<String>();
+
+    // Create a trust manager that does not validate certificate chains
+    TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager(){
+        public X509Certificate[] getAcceptedIssuers(){return null;}
+        public void checkClientTrusted(X509Certificate[] certs, String authType){}
+        public void checkServerTrusted(X509Certificate[] certs, String authType){}
+    }};
 
     private static final String[] SUPPORTED_CIPHER_SUITES = {
             "TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA",
@@ -72,7 +92,6 @@ class Main {
 
     public static void main(String[] args) {
         new Main().doMain(args);
-
     }
 
     private void doMain(String[] args) {
@@ -94,44 +113,42 @@ class Main {
                 ciphers = this.ciphers.split(",");
             }
 
-            run(
-                    url,
-                    protocols,
-                    ciphers
-            );
+            Map<String, String> headers = new HashMap<String, String>();
+            headers.put("User-Agent", "cipher_curl");
+            WebTarget target;
+            target = makeTarget(url, protocols, ciphers, this.proxyUrl,null);
+            Response res = callPostAPI(target, "{\"payload\":1}", headers);
+
+            System.out.println(res.toString());
+            System.out.println(res.readEntity(String.class));
         } catch (CmdLineException e) {
             e.printStackTrace();
         }
 
     }
 
-    private void run(String url, String[] protocols, String[] ciphers) {
-        try {
-            Map<String, String> headers = new HashMap<String, String>();
-            headers.put("User-Agent", "cipher_curl");
-            WebTarget target;
-            target = makeTarget(url, protocols, ciphers, null);
-            Response res = callPostAPI(target, "{\"payload\":1}", headers);
-            System.out.println(res.toString());
-            System.out.println(res.readEntity(String.class));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private WebTarget makeTarget(String url, String[] protocols, String[] ciphers, SSLContext sslContext) {
+    private WebTarget makeTarget(String url,
+                                 String[] protocols,
+                                 String[] ciphers,
+                                 String proxyUrl,
+                                 SSLContext sslContext) {
         Client client = ClientBuilder.newClient();
-        ApacheConnectorProvider provider = new ApacheConnectorProvider();
-        ClientConfig config = new ClientConfig().connectorProvider(provider);
 
         LayeredConnectionSocketFactory sslSocketFactory;
         if (sslContext == null) {
             sslContext = SslConfigurator.getDefaultContext();
         }
+        try {
+            if(allowAllCerts) {
+                sslContext.init(null, this.trustAllCerts, new SecureRandom());
+            }
+        } catch (KeyManagementException e) {
+            e.printStackTrace();
+        }
         sslSocketFactory = new SSLConnectionSocketFactory(
                 sslContext,
                 protocols,
-                ciphers, // SUPPORTED_CIPHER_SUITES,
+                ciphers,
                 SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
 
         Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
@@ -139,8 +156,16 @@ class Main {
                 .register("https", sslSocketFactory)
                 .build();
 
+        ApacheConnectorProvider provider = new ApacheConnectorProvider();
+        ClientConfig config = new ClientConfig().connectorProvider(provider);
+
         BasicHttpClientConnectionManager connectionManager = new BasicHttpClientConnectionManager(registry);
         config.property(ApacheClientProperties.CONNECTION_MANAGER, connectionManager);
+
+        // If proxy is set.
+        if (StringUtils.isNotBlank(proxyUrl)) {
+            config.property(ClientProperties.PROXY_URI, URI.create(proxyUrl));
+        }
 
         client = JerseyClientBuilder.newClient(config);
         return client.target(url);
@@ -155,6 +180,6 @@ class Main {
             invocationBuilder.header(entry.getKey(), entry.getValue());
         }
 
-        return (Response)invocationBuilder.post(entity);
+        return invocationBuilder.post(entity);
     }
 }
