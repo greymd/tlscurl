@@ -35,7 +35,7 @@ import java.util.Map.Entry;
 
 class Main {
 
-    private static final String VERSION = "v1.0.0";
+    private static final String VERSION = "v1.1.1";
 
     @Option(name = "-p", aliases = "--protocols", required = false, usage = "Provide protocols for TSL connection (i.e TLSv1, TLSv1.1 or TLSv1.2).")
     private String protocols = "TLSv1,TLSv1.1,TLSv1.2";
@@ -52,7 +52,7 @@ class Main {
     @Option(name = "-k", required = false, usage = "Allow self-certified SSL.")
     private Boolean allowAllCerts = false;
 
-    @Option(name = "-V", required = false, usage = "Show version and exit.")
+    @Option(name = "-V", aliases = "--version", required = false, usage = "Show version and exit.")
     private Boolean versionFlag = false;
 
     @Option(name = "--help", required = false, usage = "Show help and exit.")
@@ -127,7 +127,7 @@ class Main {
                 System.exit(0);
             }
 
-            if(this.listCiphersFlag) {
+            if (this.listCiphersFlag) {
                 showAvailableCiphers();
                 System.exit(0);
             }
@@ -138,11 +138,11 @@ class Main {
             url = arguments.get(0);
             protocols = this.protocols.split(",");
 
-            if (StringUtils.isNotEmpty(this.ciphers)) {
+            if (StringUtils.isNotEmpty(this.ciphers))
                 ciphers = this.ciphers.split(",");
-            }
 
-            Map<String, String> headers = new HashMap<String, String>();
+
+        Map<String, String> headers = new HashMap<String, String>();
             headers.put("User-Agent", "tlscurl");
             WebTarget target;
             target = makeTarget(url, protocols, ciphers, this.proxyUrl, null);
