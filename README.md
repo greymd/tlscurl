@@ -5,7 +5,7 @@
 ## Linux/macOS
 
 ```
-$ curl -L https://github.com/greymd/tlscurl/releases/download/v1.0.0/tlscurl_unix.tar.gz | tar zxv
+$ curl -L https://github.com/greymd/tlscurl/releases/download/v1.1.0/tlscurl_unix.tar.gz | tar zxv
 $ sudo install -m 0755 tlscurl /usr/bin/tlscurl
 ```
 
