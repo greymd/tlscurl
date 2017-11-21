@@ -24,6 +24,8 @@ Usage:
 
 Options:
  --help               : Show help and exit. (default: true)
+ --list-ciphers       : Show all the available ciphers starting with "*".
+                        (default: false)
  -V                   : Show version and exit. (default: false)
  -c (--ciphers) VAL   : Provide cipher suites for connection (i.e
                         TLS_RSA_WITH_RC4_128_SHA).
