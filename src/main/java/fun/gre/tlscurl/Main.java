@@ -20,6 +20,7 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.ws.rs.client.*;
@@ -29,10 +30,7 @@ import java.net.URI;
 import java.security.KeyManagementException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 
 class Main {
@@ -44,6 +42,9 @@ class Main {
 
     @Option(name = "-c", aliases = "--ciphers", required = false, usage = "Provide cipher suites for connection (i.e TLS_RSA_WITH_RC4_128_SHA).")
     private String ciphers = null;
+
+    @Option(name = "--list-ciphers", required = false, usage = "Show all the available ciphers starting with \"*\".")
+    private Boolean listCiphersFlag = false;
 
     @Option(name = "-x", required = false, usage = "Provide proxy address.")
     private String proxyUrl = "";
@@ -126,6 +127,11 @@ class Main {
                 System.exit(0);
             }
 
+            if(this.listCiphersFlag) {
+                showAvailableCiphers();
+                System.exit(0);
+            }
+
             if (arguments.isEmpty())
                 throw new CmdLineException(parser, "No argument is given");
 
@@ -203,5 +209,35 @@ class Main {
         }
 
         return invocationBuilder.post(entity);
+    }
+
+    private void showAvailableCiphers() {
+        {
+            SSLServerSocketFactory ssf = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
+
+            String[] defaultCiphers = ssf.getDefaultCipherSuites();
+            String[] availableCiphers = ssf.getSupportedCipherSuites();
+
+            TreeMap ciphers = new TreeMap();
+
+            for (int i = 0; i < availableCiphers.length; ++i)
+                ciphers.put(availableCiphers[i], Boolean.FALSE);
+
+            for (int i = 0; i < defaultCiphers.length; ++i)
+                ciphers.put(defaultCiphers[i], Boolean.TRUE);
+
+            System.out.println("Default\tCipher");
+            for (Iterator i = ciphers.entrySet().iterator(); i.hasNext(); ) {
+                Map.Entry cipher = (Map.Entry) i.next();
+
+                if (Boolean.TRUE.equals(cipher.getValue()))
+                    System.out.print('*');
+                else
+                    System.out.print(' ');
+
+                System.out.print('\t');
+                System.out.println(cipher.getKey());
+            }
+        }
     }
 }
